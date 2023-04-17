@@ -115,9 +115,9 @@ void parse_json_payload(char *data)
         else if(strcmp(screen,QRSUCCESSSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-            char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
-            strcpy(payment_status_scr_data.Date, payment_date);
-            ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
+           // char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
+           // strcpy(payment_status_scr_data.Date, payment_date);
+           // ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
             payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
             payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
             payment_status_scr_data.status = PAYMENT_SUCCESS;
@@ -128,9 +128,9 @@ void parse_json_payload(char *data)
         else if(strcmp(screen,QRCANCELSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-            char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
-            strcpy(payment_status_scr_data.Date, payment_date);
-            ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
+            //char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
+            //strcpy(payment_status_scr_data.Date, payment_date);
+            //ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
             payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
             payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
             payment_status_scr_data.status = PAYMENT_CANCEL;
@@ -141,9 +141,9 @@ void parse_json_payload(char *data)
         else if(strcmp(screen,QRFAILSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-            char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
-            strcpy(payment_status_scr_data.Date, payment_date);
-            ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
+            //char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
+            //strcpy(payment_status_scr_data.Date, payment_date);
+            //ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
             payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
             payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
             payment_status_scr_data.status = PAYMENT_FAIL;

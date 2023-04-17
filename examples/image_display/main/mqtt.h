@@ -22,6 +22,7 @@ typedef enum payment_status
     PAYMENT_SUCCESS = 0,
     PAYMENT_CANCEL,
     PAYMENT_FAIL,
+    PAYMENT_PENDING,
 }payment_status_t;
 
 typedef struct welcome_data
