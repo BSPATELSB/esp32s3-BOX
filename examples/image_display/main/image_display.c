@@ -9,6 +9,15 @@
 #include "bsp/esp-bsp.h"
 #include "esp_log.h"
 #include "mqtt.h"
+
+/*Header files of audio support */
+#include "audio_player.h"
+#include "esp_check.h"
+#include "file_iterator.h"
+#include "ui_audio.h"
+//#include "bsp_board.h"
+
+
 #define IMAGE_DISPLAY_QUEUE_SIZE 5
 static const char *TAG = "main";
 
