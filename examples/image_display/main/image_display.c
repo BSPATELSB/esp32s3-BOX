@@ -93,7 +93,7 @@ static esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
 	static uint8_t last_volume;
 	bsp_codec_config_t *codec_handle = bsp_board_get_codec_handle();
 	//  uint8_t volume = get_sys_volume();
-	uint8_t volume = 100;
+	uint8_t volume = 80;
 	if (volume != 0) {
 		last_volume = volume;
 	}

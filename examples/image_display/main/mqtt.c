@@ -33,12 +33,44 @@
 #include "cJSON.h"
 #include "mqtt.h"
 
+/*Header files of image display added*/
+#include<dirent.h>
+
+#include "bsp/esp-bsp.h"
+#include "esp_log.h"
+#include "mqtt.h"
+
+/*Header files of audio support */
+#include "audio_player.h"
+#include "esp_check.h"
+#include "file_iterator.h"
+#include "ui_audio.h"
+#include "bsp_board.h"
+
+
 static const char *TAG = "MQTTS_EXAMPLE";
 
 static welcome_data_t welcome_screen_data;
 static total_data_t total_screen_data;
 static QR_code_data_t QR_code_screen_data;
 static payment_status_data_t payment_status_scr_data;
+
+/*This function is made for handle the exceptions, occur when json packets coming*/
+
+void exception_handler(void)
+{
+    char exceptions[20] = "Invalid String";
+    lv_obj_clean(lv_scr_act());
+    /*Change the active screen's background color*/
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), LV_PART_MAIN);
+
+    /*Create a white label, set its text and align it to the center*/
+    lv_obj_t * label = lv_label_create(lv_scr_act());
+    lv_label_set_text(label, &exceptions);
+    lv_obj_set_style_text_color(lv_scr_act(), lv_color_hex(0xffffff), LV_PART_MAIN);
+    lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
+	
+}
 
 void get_welcome_screen_data(welcome_data_t *data)
 {
@@ -57,7 +89,9 @@ void get_payment_status_data(payment_status_data_t *data)
     data->status = payment_status_scr_data.status;
     data->BankRef = payment_status_scr_data.BankRef;
     data->OrderId = payment_status_scr_data.OrderId;
-    strcpy(data->Date, payment_status_scr_data.Date);
+    data->Date = payment_status_scr_data.Date;
+    data->Amount = payment_status_scr_data.Amount;
+    //strcpy(data->Date, payment_status_scr_data.Date);
 }
 void get_QR_code_screen_data(QR_code_data_t *data)
 {
@@ -70,10 +104,10 @@ void get_QR_code_screen_data(QR_code_data_t *data)
 void parse_json_payload(char *data)
 {
     cJSON *root = cJSON_Parse(data);
-    if (cJSON_GetObjectItem(root, "screen")) 
+    if (cJSON_GetObjectItem(root, "screen"))
     {
-		char *screen = cJSON_GetObjectItem(root,"screen")->valuestring;
-		ESP_LOGI(TAG, "screen=%s",screen);
+	char *screen = cJSON_GetObjectItem(root,"screen")->valuestring;
+	ESP_LOGI(TAG, "screen=%s",screen);
         if(strcmp(screen,WELCOMESCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
@@ -85,70 +119,402 @@ void parse_json_payload(char *data)
         else if(strcmp(screen,TOTALSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-            total_screen_data.TotalAmount = cJSON_GetObjectItem(data,"TotalAmount")->valueint;
-            total_screen_data.DiscountAmount = cJSON_GetObjectItem(data,"DiscountAmount")->valueint;
-            total_screen_data.TaxAmount = cJSON_GetObjectItem(data,"TaxAmount")->valueint;
-            total_screen_data.GrandTotal = cJSON_GetObjectItem(data,"GrandTotal")->valueint;
-            ESP_LOGI(TAG,"TotalAmount:%d DiscountAmount:%d TaxAmount:%d GrandTotal:%d",
+	    if(NULL != cJSON_GetObjectItem(data,"TotalAmount"))
+	    {
+	         total_screen_data.TotalAmount = cJSON_GetObjectItem(data,"TotalAmount")->valueint;
+		 if(total_screen_data.TotalAmount < 0)
+		 {
+		    ESP_LOGI(TAG, "INVALID STRING");
+               	    exception_handler();
+                    return;
+		 }
+	    }
+	    else
+	    {
+	    	ESP_LOGI(TAG, "INVALID STRING");
+		exception_handler();
+		return;
+	    }
+
+	    if(NULL != cJSON_GetObjectItem(data,"DiscountAmount"))
+            {
+ 		total_screen_data.DiscountAmount = cJSON_GetObjectItem(data,"DiscountAmount")->valueint;
+		if(total_screen_data.DiscountAmount < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"TaxAmount"))
+            {
+		total_screen_data.TaxAmount = cJSON_GetObjectItem(data,"TaxAmount")->valueint;
+		if(total_screen_data.TaxAmount < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"GrandTotal"))
+            {
+		total_screen_data.GrandTotal = cJSON_GetObjectItem(data,"GrandTotal")->valueint;
+		if(total_screen_data.GrandTotal < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+      	    ESP_LOGI(TAG,"TotalAmount:%d DiscountAmount:%d TaxAmount:%d GrandTotal:%d",
             total_screen_data.TotalAmount, total_screen_data.DiscountAmount,total_screen_data.TaxAmount,total_screen_data.GrandTotal);
             xEventGroupSetBits(event_group, TOTALSCREEN_EVT);
         }
         else if(strcmp(screen,QRCODESCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-            char *QrCodeBase64 = cJSON_GetObjectItem(data,"QrCodeBase64")->valuestring;
-            strcpy(QR_code_screen_data.QrCodeBase64, QrCodeBase64);
-            ESP_LOGI(TAG,"QrCodeBase64:%s",QR_code_screen_data.QrCodeBase64);
-            char *UPIUrl = cJSON_GetObjectItem(data,"UPIUrl")->valuestring;
-            strcpy(QR_code_screen_data.UPIUrl, UPIUrl);
-            ESP_LOGI(TAG,"UPIUrl:%s",QR_code_screen_data.UPIUrl);
-            char *CompanyName = cJSON_GetObjectItem(data,"CompanyName")->valuestring;
-            strcpy(QR_code_screen_data.CompanyName, CompanyName);
-            ESP_LOGI(TAG,"CompanyName:%s",QR_code_screen_data.CompanyName);
-            char *ShopName = cJSON_GetObjectItem(data,"ShopName")->valuestring;
-            strcpy(QR_code_screen_data.ShopName, ShopName);
-            ESP_LOGI(TAG,"ShopName:%s",QR_code_screen_data.ShopName);
-            QR_code_screen_data.Amount = cJSON_GetObjectItem(data,"Amount")->valueint;
-            ESP_LOGI(TAG,"Amount:%d",QR_code_screen_data.Amount);
+
+	    if(NULL != cJSON_GetObjectItem(data,"QrCodeBase64"))
+            {
+                char *QrCodeBase64 = cJSON_GetObjectItem(data,"QrCodeBase64")->valuestring;
+		strcpy(QR_code_screen_data.QrCodeBase64, QrCodeBase64);
+		ESP_LOGI(TAG,"QrCodeBase64:%s",QR_code_screen_data.QrCodeBase64);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"UPIUrl"))
+            {
+                char *UPIUrl = cJSON_GetObjectItem(data,"UPIUrl")->valuestring;
+                strcpy(QR_code_screen_data.UPIUrl, UPIUrl);
+                ESP_LOGI(TAG,"UPIUrl:%s",QR_code_screen_data.UPIUrl);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"CompanyName"))
+            {
+                char *CompanyName = cJSON_GetObjectItem(data,"CompanyName")->valuestring;
+                strcpy(QR_code_screen_data.CompanyName, CompanyName);
+                ESP_LOGI(TAG,"CompanyName:%s",QR_code_screen_data.CompanyName);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"ShopName"))
+            {
+		 char *ShopName = cJSON_GetObjectItem(data,"ShopName")->valuestring;
+		 strcpy(QR_code_screen_data.ShopName, ShopName);
+		 ESP_LOGI(TAG,"ShopName:%s",QR_code_screen_data.ShopName);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"Amount"))
+            {
+                QR_code_screen_data.Amount = cJSON_GetObjectItem(data,"Amount")->valueint;
+		ESP_LOGI(TAG,"Amount:%d",QR_code_screen_data.Amount);
+		if(QR_code_screen_data.Amount < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+	    }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
             xEventGroupSetBits(event_group, QRCODESCREEN_EVT);
         }
         else if(strcmp(screen,QRSUCCESSSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-           // char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
-           // strcpy(payment_status_scr_data.Date, payment_date);
-           // ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
-            payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
-            payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
+            //int *payment_date = cJSON_GetObjectItem(data,"Date")->valueint;
+	    if(NULL != cJSON_GetObjectItem(data,"Date"))
+            {
+	        payment_status_scr_data.Date = cJSON_GetObjectItem(data,"Date")->valueint;
+	        ESP_LOGI(TAG,"payment_date:%d",payment_status_scr_data.Date);
+	    	if(payment_status_scr_data.Date < 0)
+             	{
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+              	}
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"OrderId"))
+            {
+                payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
+		if(payment_status_scr_data.OrderId < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"BankRef"))
+            {
+                payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
+		if(payment_status_scr_data.BankRef < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"Amount"))
+            {
+                payment_status_scr_data.Amount = cJSON_GetObjectItem(data,"Amount")->valueint;
+                ESP_LOGI(TAG,"Amount:%d",QR_code_screen_data.Amount);
+		if(payment_status_scr_data.Amount < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+            //strcpy(payment_status_scr_data.Date, payment_date);
+	    //sprintf(payment_status_scr_data.Date,"%d",payment_date);
             payment_status_scr_data.status = PAYMENT_SUCCESS;
-            ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d",
-            payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef);
+            ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
+            payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef,payment_status_scr_data.Date);
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
         }
         else if(strcmp(screen,QRCANCELSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
+
+	    if(NULL != cJSON_GetObjectItem(data,"Date"))
+            {
+            	payment_status_scr_data.Date = cJSON_GetObjectItem(data,"Date")->valueint;
+                ESP_LOGI(TAG,"payment_date:%d",payment_status_scr_data.Date);
+	    	if(payment_status_scr_data.Date < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"OrderId"))
+            {
+                payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
+		if(payment_status_scr_data.OrderId < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"BankRef"))
+            {
+                payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
+		if(payment_status_scr_data.BankRef < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+               }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"Amount"))
+            {
+                payment_status_scr_data.Amount = cJSON_GetObjectItem(data,"Amount")->valueint;
+                ESP_LOGI(TAG,"Amount:%d",QR_code_screen_data.Amount);
+		if(payment_status_scr_data.Amount < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
             //char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
             //strcpy(payment_status_scr_data.Date, payment_date);
             //ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
-            payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
-            payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
             payment_status_scr_data.status = PAYMENT_CANCEL;
-            ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d",
-            payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef);
+            ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
+            payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef,payment_status_scr_data.Date);
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
         }
         else if(strcmp(screen,QRFAILSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
+
+	    if(NULL != cJSON_GetObjectItem(data,"Date"))
+            {
+                payment_status_scr_data.Date = cJSON_GetObjectItem(data,"Date")->valueint;
+                ESP_LOGI(TAG,"payment_date:%d",payment_status_scr_data.Date);
+            	if(payment_status_scr_data.Date < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"OrderId"))
+            {
+                payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
+		if(payment_status_scr_data.OrderId < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"BankRef"))
+            {
+                payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
+		if(payment_status_scr_data.BankRef < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
+	    if(NULL != cJSON_GetObjectItem(data,"Amount"))
+            {
+                payment_status_scr_data.Amount = cJSON_GetObjectItem(data,"Amount")->valueint;
+                ESP_LOGI(TAG,"Amount:%d",QR_code_screen_data.Amount);
+		if(payment_status_scr_data.Amount < 0)
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
             //char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
             //strcpy(payment_status_scr_data.Date, payment_date);
             //ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
-            payment_status_scr_data.OrderId = cJSON_GetObjectItem(data,"OrderId")->valueint;
-            payment_status_scr_data.BankRef = cJSON_GetObjectItem(data,"BankRef")->valueint;
             payment_status_scr_data.status = PAYMENT_FAIL;
-            ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d",
-            payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef);
+            ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
+            payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef, payment_status_scr_data.Date);
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
         }
         else

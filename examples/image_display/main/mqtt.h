@@ -55,7 +55,9 @@ typedef struct payment_status_data
     payment_status_t status;
     int OrderId;
     int BankRef;
-    char Date[100];
+   // char Date[100];
+    int Date;
+    int Amount;
     char img[100];
 }payment_status_data_t;
 void get_welcome_screen_data(welcome_data_t *data);
