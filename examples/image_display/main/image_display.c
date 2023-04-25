@@ -49,16 +49,16 @@ static void play_audio_file(int type)
 	switch(type)
 	{
 		case WELCOME:
-		        strcpy(filename, "/spiffs/welcome.wav");
+		        strcpy(filename, "/spiffs/welcome_screen.wav");
 			break;
 		case P_PASS:
-			strcpy(filename, "/spiffs/PS.wav");
+			strcpy(filename, "/spiffs/Payment_successful.wav");
 			break;
 		case P_FAIL:
-			strcpy(filename, "/spiffs/PF.wav");
+			strcpy(filename, "/spiffs/Payment_Failed.wav");
 			break;
 		case P_CANCEL:
-			strcpy(filename, "/spiffs/PC.wav");
+			strcpy(filename, "/spiffs/Payment_Cancel.wav");
 			break;
 		case PON:
 			strcpy(filename, "/spiffs/Canon.mp3");
@@ -88,7 +88,7 @@ static void play_audio_file(int type)
 }
 /*Audio configuration*/
 
-static esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
+esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
 {
 	static uint8_t last_volume;
 	bsp_codec_config_t *codec_handle = bsp_board_get_codec_handle();
