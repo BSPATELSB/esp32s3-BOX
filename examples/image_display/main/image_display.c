@@ -42,14 +42,14 @@ enum payment_event
     PON, 
 }event_type_t;
 
-static void play_audio_file(int type)
+/*static void play_audio_file(int type)
 {
         ESP_LOGI(TAG, "play audio file %d ",type);
 	char filename[128] = {0};
 	switch(type)
 	{
 		case WELCOME:
-		        strcpy(filename, "/spiffs/welcome_screen.wav");
+		        //strcpy(filename, "/spiffs/welcome_screen.wav");
 			break;
 		case P_PASS:
 			strcpy(filename, "/spiffs/Payment_successful.wav");
@@ -85,7 +85,7 @@ static void play_audio_file(int type)
 		ESP_LOGE(TAG, "unable to open,filename '%s'", filename);
 	}
 
-}
+}*/
 /*Audio configuration*/
 
 esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
@@ -125,19 +125,19 @@ void display_payment_status(payment_status_data_t *data)
     {
 	ESP_LOGI(TAG, "Entered in if_impage_dis");
         lv_img_set_src(img, pass_file_name_with_path);
-        play_audio_file(P_PASS);
+        //play_audio_file(P_PASS);
         ESP_LOGI(TAG, "Display image file : %s",pass_file_name_with_path);
     }
     else if(data->status == PAYMENT_FAIL){
         ESP_LOGI(TAG, "Entered in elseif_impage_dis");
         lv_img_set_src(img, fail_file_name_with_path);
-        play_audio_file(P_FAIL);
+        //play_audio_file(P_FAIL);
         ESP_LOGI(TAG, "Display image file : %s",fail_file_name_with_path);
     }
     else if(data->status == PAYMENT_CANCEL){
         ESP_LOGI(TAG, "Entered in elseif_impage_dis");
         lv_img_set_src(img, cancel_file_name_with_path);
-        play_audio_file(P_CANCEL);
+        //play_audio_file(P_CANCEL);
         ESP_LOGI(TAG, "Display image file : %s",cancel_file_name_with_path);
     }
     else
@@ -184,7 +184,7 @@ void display_total_screen(total_data_t *data)
 
     sprintf(str,"TotalAmount: %d",data->TotalAmount);
     lv_label_set_text(label,str);
-    play_audio_file(data->TotalAmount);
+    //play_audio_file(data->TotalAmount);
     lv_obj_set_style_text_color(lv_scr_act(), lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
     
@@ -214,7 +214,7 @@ static void image_display_task(void *arg)
             welcome_data_t data;
             get_welcome_screen_data(&data);
             display_welcome_screen(data.title);
-	    play_audio_file(WELCOME);
+	        //play_audio_file(WELCOME);
         }
         if(event_bit & TOTALSCREEN_EVT)
         {
@@ -293,13 +293,13 @@ void app_main(void)
     ESP_ERROR_CHECK(audio_player_new(config));
 
     //ui_audio_start(file_iterator);
-    play_audio_file(PON);
+    //play_audio_file(PON);
 
     wifi_main();
     mqtt_app_start();
     while(1)
     {
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 

@@ -29,6 +29,7 @@ typedef struct welcome_data
 {
     char title[512];
     char img[100];
+    char voice_url[512];
 }welcome_data_t;
 
 typedef struct total_data
@@ -38,6 +39,7 @@ typedef struct total_data
     int TaxAmount;
     int GrandTotal;
     char img[100];
+    char voice_url[512];
 }total_data_t;
 
 typedef struct QR_code_data
@@ -48,6 +50,7 @@ typedef struct QR_code_data
     char CompanyName[100];
     char ShopName[100];
     char img[100];
+    char voice_url[512];
 }QR_code_data_t;
 
 typedef struct payment_status_data
@@ -59,6 +62,7 @@ typedef struct payment_status_data
     int Date;
     int Amount;
     char img[100];
+    char voice_url[512];
 }payment_status_data_t;
 void get_welcome_screen_data(welcome_data_t *data);
 void get_total_screen_data(total_data_t *data);
