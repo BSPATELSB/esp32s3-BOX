@@ -460,9 +460,10 @@ void parse_json_payload(char *data)
             payment_status_scr_data.status = PAYMENT_SUCCESS;
             voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
             strcpy(QR_code_screen_data.voice_url, voice_url);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
             ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
             payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef,payment_status_scr_data.Date);
+            fetch_and_store_audio_data(voice_url,file_path_wav);
+            vTaskDelay(pdMS_TO_TICKS(2000));
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
         }
         else if(strcmp(screen,QRCANCELSCREEN) == 0)

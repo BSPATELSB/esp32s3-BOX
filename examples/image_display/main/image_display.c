@@ -42,7 +42,7 @@ enum payment_event
     PON, 
 }event_type_t;
 
-/*static void play_audio_file(int type)
+static void play_audio_file(int type)
 {
         ESP_LOGI(TAG, "play audio file %d ",type);
 	char filename[128] = {0};
@@ -52,7 +52,7 @@ enum payment_event
 		        //strcpy(filename, "/spiffs/welcome_screen.wav");
 			break;
 		case P_PASS:
-			strcpy(filename, "/spiffs/Payment_successful.wav");
+			strcpy(filename, "/spiffs/default_received.wav");
 			break;
 		case P_FAIL:
 			strcpy(filename, "/spiffs/Payment_Failed.wav");
@@ -85,7 +85,7 @@ enum payment_event
 		ESP_LOGE(TAG, "unable to open,filename '%s'", filename);
 	}
 
-}*/
+}
 /*Audio configuration*/
 
 esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
@@ -93,7 +93,7 @@ esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
 	static uint8_t last_volume;
 	bsp_codec_config_t *codec_handle = bsp_board_get_codec_handle();
 	//  uint8_t volume = get_sys_volume();
-	uint8_t volume = 80;
+	uint8_t volume = 60;
 	if (volume != 0) {
 		last_volume = volume;
 	}
@@ -125,7 +125,7 @@ void display_payment_status(payment_status_data_t *data)
     {
 	ESP_LOGI(TAG, "Entered in if_impage_dis");
         lv_img_set_src(img, pass_file_name_with_path);
-        //play_audio_file(P_PASS);
+        play_audio_file(P_PASS);
         ESP_LOGI(TAG, "Display image file : %s",pass_file_name_with_path);
     }
     else if(data->status == PAYMENT_FAIL){
