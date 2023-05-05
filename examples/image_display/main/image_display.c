@@ -42,6 +42,29 @@ enum payment_event
     PON, 
 }event_type_t;
 
+/*volume slider implementation*/
+static uint8_t g_sys_volume;
+static void volume_slider_cb(lv_event_t *event)
+{
+    lv_obj_t *slider = (lv_obj_t *) event->target;
+    int volume = lv_slider_get_value(slider);
+    bsp_codec_config_t *codec_handle = bsp_board_get_codec_handle();
+    codec_handle->volume_set_fn(volume, NULL);
+    g_sys_volume = volume;
+    ESP_LOGI(TAG, "volume '%d'", volume);
+}
+
+void audio_volume(void)
+{
+    lv_obj_t *volume_slider = lv_slider_create(lv_scr_act());
+    lv_obj_set_size(volume_slider, 200, 6);
+    lv_obj_set_ext_click_area(volume_slider, 15);
+    lv_obj_align(volume_slider, LV_ALIGN_BOTTOM_MID, 0, -20);
+    lv_slider_set_range(volume_slider, 0, 100);
+    lv_slider_set_value(volume_slider, g_sys_volume, LV_ANIM_ON);
+    lv_obj_add_event_cb(volume_slider, volume_slider_cb, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
 static void play_audio_file(int type)
 {
         ESP_LOGI(TAG, "play audio file %d ",type);
@@ -93,7 +116,7 @@ esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
 	static uint8_t last_volume;
 	bsp_codec_config_t *codec_handle = bsp_board_get_codec_handle();
 	//  uint8_t volume = get_sys_volume();
-	uint8_t volume = 60;
+	uint8_t volume = g_sys_volume;
 	if (volume != 0) {
 		last_volume = volume;
 	}
@@ -202,6 +225,7 @@ static void image_display_task(void *arg)
     lv_obj_t *img = lv_img_create(lv_scr_act());
     lv_obj_align(img, LV_ALIGN_CENTER, 0, 0);
     lv_img_set_src(img, welcome_file_name_with_path);
+    audio_volume();
 
     while(1)
     {
@@ -215,24 +239,28 @@ static void image_display_task(void *arg)
             get_welcome_screen_data(&data);
             display_welcome_screen(data.title);
 	        //play_audio_file(WELCOME);
+            audio_volume();
         }
         if(event_bit & TOTALSCREEN_EVT)
         {
             total_data_t data;
             get_total_screen_data(&data);
             display_total_screen(&data);
+            audio_volume();
         }
         if(event_bit & QRCODESCREEN_EVT)
         {
             QR_code_data_t data;
             get_QR_code_screen_data(&data);
             display_qrcode(data.UPIUrl);
+            audio_volume();
         }
         if(event_bit & PAYMENTSTATUS_EVT)
         {
            payment_status_data_t payment;
            get_payment_status_data(&payment);
-           display_payment_status(&payment); 
+           display_payment_status(&payment);
+           audio_volume();
         }
     }
 }

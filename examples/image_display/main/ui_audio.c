@@ -163,7 +163,7 @@ uint8_t get_sys_volume()
 void ui_audio_start(file_iterator_instance_t *i)
 {
     file_iterator = i;
-    g_sys_volume = 80;
+    //g_sys_volume;
 
     /* Create audio control button */
     lv_obj_t *btn_play_pause = lv_btn_create(lv_scr_act());
