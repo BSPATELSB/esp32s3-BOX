@@ -17,7 +17,6 @@
 #include "ui_audio.h"
 #include "bsp_board.h"
 
-
 #define IMAGE_DISPLAY_QUEUE_SIZE 5
 static const char *TAG = "main";
 
@@ -32,7 +31,7 @@ typedef struct display_data
 	int datasize;
 }display_data_t;
 
-
+#if 0
 enum payment_event
 {
     WELCOME = 0,
@@ -41,6 +40,7 @@ enum payment_event
     P_CANCEL,
     PON, 
 }event_type_t;
+#endif
 
 /*volume slider implementation*/
 static uint8_t g_sys_volume;
@@ -65,6 +65,8 @@ void audio_volume(void)
     lv_obj_add_event_cb(volume_slider, volume_slider_cb, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
+/*Temporary Audio Files*/
+#if 0
 static void play_audio_file(int type)
 {
         ESP_LOGI(TAG, "play audio file %d ",type);
@@ -109,6 +111,7 @@ static void play_audio_file(int type)
 	}
 
 }
+#endif
 /*Audio configuration*/
 
 esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
@@ -121,9 +124,6 @@ esp_err_t audio_mute_function(AUDIO_PLAYER_MUTE_SETTING setting)
 		last_volume = volume;
 	}
 
-	//  codec_handle->mute_set_fn(setting == AUDIO_PLAYER_MUTE ? true : false);
-	//  codec_handle->mute_set_fn(setting == AUDIO_PLAYER_UNMUTE);
-	//  restore the voice volume upon unmuting
 	if (setting == AUDIO_PLAYER_UNMUTE) {
 		codec_handle->volume_set_fn(volume, NULL);
 	}
@@ -146,26 +146,22 @@ void display_payment_status(payment_status_data_t *data)
 
     if(data->status == PAYMENT_SUCCESS)
     {
-	ESP_LOGI(TAG, "Entered in if_impage_dis");
         lv_img_set_src(img, pass_file_name_with_path);
-        play_audio_file(P_PASS);
         ESP_LOGI(TAG, "Display image file : %s",pass_file_name_with_path);
     }
     else if(data->status == PAYMENT_FAIL){
-        ESP_LOGI(TAG, "Entered in elseif_impage_dis");
+
         lv_img_set_src(img, fail_file_name_with_path);
-        //play_audio_file(P_FAIL);
         ESP_LOGI(TAG, "Display image file : %s",fail_file_name_with_path);
     }
     else if(data->status == PAYMENT_CANCEL){
-        ESP_LOGI(TAG, "Entered in elseif_impage_dis");
+
         lv_img_set_src(img, cancel_file_name_with_path);
-        //play_audio_file(P_CANCEL);
         ESP_LOGI(TAG, "Display image file : %s",cancel_file_name_with_path);
     }
     else
     {
-        ESP_LOGI(TAG, "Entered in else_impage_dis");
+
         lv_img_set_src(img, pending_file_name_with_path);
         ESP_LOGI(TAG, "Display image file : %s",pending_file_name_with_path);
     }
@@ -213,10 +209,6 @@ void display_total_screen(total_data_t *data)
     
 }
 
-/*void display_payment_status(payment_status_data_t payment)
-{
-
-}*/
 static void image_display_task(void *arg)
 {
     lv_obj_clean(lv_scr_act());
@@ -238,7 +230,6 @@ static void image_display_task(void *arg)
             welcome_data_t data;
             get_welcome_screen_data(&data);
             display_welcome_screen(data.title);
-	        //play_audio_file(WELCOME);
             audio_volume();
         }
         if(event_bit & TOTALSCREEN_EVT)
@@ -268,12 +259,7 @@ void image_display_init(void)
 {
     BaseType_t xReturned;
     TaskHandle_t xHandle = NULL;
-    // image_display_queue = xQueueCreate(IMAGE_DISPLAY_QUEUE_SIZE, sizeof(display_data_t));
-    // if (NULL == image_display_queue)
-    // {
-    //     ESP_LOGE(TAG, "image_display_queue queue create fail");
-    //     abort();
-    // }
+
     /* create event groups */
     event_group = xEventGroupCreate();
     if (NULL == event_group)
@@ -320,14 +306,11 @@ void app_main(void)
                                    };
     ESP_ERROR_CHECK(audio_player_new(config));
 
-    //ui_audio_start(file_iterator);
-    //play_audio_file(PON);
-
     wifi_main();
     mqtt_app_start();
     while(1)
     {
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
 

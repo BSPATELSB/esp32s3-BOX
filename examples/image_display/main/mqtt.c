@@ -61,36 +61,18 @@ static payment_status_data_t payment_status_scr_data;
 /*HTTP Parsing URL*/
 char* voice_url;
 char* file_path_wav = "/spiffs";
-static char buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
 int content_length = 0;
 int data_read;
-
 
 void fetch_and_store_audio_data(const char *url, const char *file_path) {
     // Configure the HTTP client
     esp_http_client_config_t config = {
-        .url = voice_url,
+        .url = url,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
-#if 0
-    // Send the HTTP request and receive the response
-    esp_err_t err = esp_http_client_perform(client);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to fetch audio data from %s: %s", url, esp_err_to_name(err));
-        esp_http_client_cleanup(client);
-        return;
-    }
+    char *buffer = (char *) malloc(MAX_HTTP_OUTPUT_BUFFER);
 
-    /*Read the HTTP response body and store it in a buffer*/
-
-    int content_length = esp_http_client_get_content_length(client);
-    ESP_LOGI(TAG, "Leangth of content is %d", content_length);
-    char *buffer = (char *)malloc(content_length + 1);
-    int bytes_read = esp_http_client_read_response(client, buffer, content_length);
-    buffer[content_length] = '\0';
-    ESP_LOGI(TAG, "***Buffer is %s", buffer);
-#endif
     esp_http_client_set_method(client, HTTP_METHOD_GET);
     esp_err_t err = esp_http_client_open(client, 0);
     if (err != ESP_OK) {
@@ -102,8 +84,7 @@ void fetch_and_store_audio_data(const char *url, const char *file_path) {
             ESP_LOGE(TAG, "HTTP client fetch headers failed");
         }
         else {
-            memset(buffer, 0, MAX_HTTP_OUTPUT_BUFFER*sizeof(buffer[0]));
-            data_read = esp_http_client_read_response(client, buffer,sizeof(buffer));
+            data_read = esp_http_client_read_response(client, buffer,MAX_HTTP_OUTPUT_BUFFER);
             if (data_read >= 0) {
                 ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %d",
                 esp_http_client_get_status_code(client),
@@ -115,10 +96,8 @@ void fetch_and_store_audio_data(const char *url, const char *file_path) {
             }
         }
     }
-    // esp_http_client_close(client);
 
     FILE *file = fopen(file_path_wav, "wb");
-    //ESP_LOGI(TAG,"String of file_path_wav %s",file_path_wav);
     if (file == NULL) {
         ESP_LOGE(TAG, "Failed to open file %s for writing", file_path_wav);
         esp_http_client_cleanup(client);
@@ -127,6 +106,7 @@ void fetch_and_store_audio_data(const char *url, const char *file_path) {
 
     fwrite(buffer, 1, data_read, file);
     fclose(file);
+    free(buffer);
     file = fopen(file_path_wav, "rb");
     audio_player_play(file);
 
@@ -134,21 +114,21 @@ void fetch_and_store_audio_data(const char *url, const char *file_path) {
     esp_http_client_cleanup(client);
 }
 
-// static void exception_audio(void)
-// {
-//     char filename[100] = "/spiffs/Invalid_String.wav";
-//     ESP_LOGI(TAG, "opening file '%s'", filename);
-//     FILE *fp = fopen(filename, "rb");
-//     if (fp)
-//     {
-//         audio_player_play(fp);
-//         ESP_LOGI(TAG, "Playing '%s'", filename);
-//     }
-//     else
-//     {
-//         ESP_LOGE(TAG, "unable to open,filename '%s'", filename);
-//     }
-// }
+static void exception_audio(void)
+{
+    char filename[100] = "/spiffs/Invalid_String.wav";
+    ESP_LOGI(TAG, "opening file '%s'", filename);
+    FILE *fp = fopen(filename, "rb");
+    if (fp)
+    {
+        audio_player_play(fp);
+        ESP_LOGI(TAG, "Playing '%s'", filename);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "unable to open,filename '%s'", filename);
+    }
+}
 
 /*This function is made for handle the exceptions, occur when json packets coming*/
 void exception_handler(void)
@@ -163,7 +143,7 @@ void exception_handler(void)
     lv_label_set_text(label, exceptions);
     lv_obj_set_style_text_color(lv_scr_act(), lv_color_hex(0xffffff), LV_PART_MAIN);
     lv_obj_align(label, LV_ALIGN_CENTER, 0, 0);
-    //exception_audio();
+    exception_audio();
 }
 
 void get_welcome_screen_data(welcome_data_t *data)
@@ -188,8 +168,8 @@ void get_payment_status_data(payment_status_data_t *data)
     data->Date = payment_status_scr_data.Date;
     data->Amount = payment_status_scr_data.Amount;
     strcpy(data->voice_url, payment_status_scr_data.voice_url);
-    //strcpy(data->Date, payment_status_scr_data.Date);
 }
+
 void get_QR_code_screen_data(QR_code_data_t *data)
 {
     data->Amount = QR_code_screen_data.Amount;
@@ -208,15 +188,33 @@ void parse_json_payload(char *data)
         ESP_LOGI(TAG, "screen=%s",screen);
         if(strcmp(screen,WELCOMESCREEN) == 0)
         {
-            cJSON *data = cJSON_GetObjectItem(root,"data");
-            char *title = cJSON_GetObjectItem(data,"title")->valuestring;
-            voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
-            strcpy(welcome_screen_data.voice_url, voice_url);
-            strcpy(welcome_screen_data.title, title);
-            ESP_LOGI(TAG,"title:%s",welcome_screen_data.title);
-            ESP_LOGI(TAG,"voice_data:%s",welcome_screen_data.voice_url);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
-            xEventGroupSetBits(event_group, WELCOMESCREEN_EVT);
+            if(NULL != cJSON_GetObjectItem(root,"data"))
+            {
+                cJSON *data = cJSON_GetObjectItem(root,"data");
+                if(NULL != cJSON_GetObjectItem(data,"title") && cJSON_GetObjectItem(data,"voice_data"))
+                {
+                    char *title = cJSON_GetObjectItem(data,"title")->valuestring;
+                    voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
+                    strcpy(welcome_screen_data.voice_url, voice_url);
+                    strcpy(welcome_screen_data.title, title);
+                    ESP_LOGI(TAG,"title:%s",welcome_screen_data.title);
+                    ESP_LOGI(TAG,"voice_data:%s",welcome_screen_data.voice_url);
+                    fetch_and_store_audio_data(voice_url,file_path_wav);
+                }
+                else
+                {
+                    ESP_LOGI(TAG, "INVALID STRING");
+                    exception_handler();
+                    return;
+                }
+                xEventGroupSetBits(event_group, WELCOMESCREEN_EVT);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
         }
         else if(strcmp(screen,TOTALSCREEN) == 0)
         {
@@ -292,12 +290,22 @@ void parse_json_payload(char *data)
                 exception_handler();
                 return;
             }
-            voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
-            memset(total_screen_data.voice_url, 0,sizeof(total_screen_data.voice_url));
-            strcpy(total_screen_data.voice_url, voice_url);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
-            ESP_LOGI(TAG,"voice_data:%s",total_screen_data.voice_url);
-      	    ESP_LOGI(TAG,"TotalAmount:%d DiscountAmount:%d TaxAmount:%d GrandTotal:%d",
+
+            if(NULL != cJSON_GetObjectItem(data,"voice_data"))
+            {
+                voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
+                memset(total_screen_data.voice_url, 0,sizeof(total_screen_data.voice_url));
+                strcpy(total_screen_data.voice_url, voice_url);
+                fetch_and_store_audio_data(voice_url,file_path_wav);
+                ESP_LOGI(TAG,"voice_data:%s",total_screen_data.voice_url);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+            ESP_LOGI(TAG,"TotalAmount:%d DiscountAmount:%d TaxAmount:%d GrandTotal:%d",
             total_screen_data.TotalAmount, total_screen_data.DiscountAmount,total_screen_data.TaxAmount,total_screen_data.GrandTotal);
             xEventGroupSetBits(event_group, TOTALSCREEN_EVT);
         }
@@ -375,16 +383,25 @@ void parse_json_payload(char *data)
                 return;
             }
 
-            voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
-            strcpy(QR_code_screen_data.voice_url, voice_url);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
-            ESP_LOGI(TAG,"voice_data:%s",QR_code_screen_data.voice_url);
+            if(NULL != cJSON_GetObjectItem(data,"voice_data"))
+            {
+                voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
+                strcpy(QR_code_screen_data.voice_url, voice_url);
+                fetch_and_store_audio_data(voice_url,file_path_wav);
+                ESP_LOGI(TAG,"voice_data:%s",QR_code_screen_data.voice_url);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
             xEventGroupSetBits(event_group, QRCODESCREEN_EVT);
         }
         else if(strcmp(screen,QRSUCCESSSCREEN) == 0)
         {
             cJSON *data = cJSON_GetObjectItem(root,"data");
-            //int *payment_date = cJSON_GetObjectItem(data,"Date")->valueint;
+
 	        if(NULL != cJSON_GetObjectItem(data,"Date"))
             {
 	            payment_status_scr_data.Date = cJSON_GetObjectItem(data,"Date")->valueint;
@@ -455,15 +472,21 @@ void parse_json_payload(char *data)
                 return;
             }
 
-            //strcpy(payment_status_scr_data.Date, payment_date);
-	        //sprintf(payment_status_scr_data.Date,"%d",payment_date);
             payment_status_scr_data.status = PAYMENT_SUCCESS;
-            voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
-            strcpy(QR_code_screen_data.voice_url, voice_url);
+            if(NULL != cJSON_GetObjectItem(data,"voice_data"))
+            {
+                voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
+                strcpy(QR_code_screen_data.voice_url, voice_url);
+                fetch_and_store_audio_data(voice_url,file_path_wav);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
             ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
             payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef,payment_status_scr_data.Date);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
-            vTaskDelay(pdMS_TO_TICKS(2000));
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
         }
         else if(strcmp(screen,QRCANCELSCREEN) == 0)
@@ -540,13 +563,19 @@ void parse_json_payload(char *data)
                 return;
             }
 
-            //char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
-            //strcpy(payment_status_scr_data.Date, payment_date);
-            //ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
+            if(NULL != cJSON_GetObjectItem(data, "voice_data"))
+            {
+                voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
+                strcpy(QR_code_screen_data.voice_url, voice_url);
+                fetch_and_store_audio_data(voice_url,file_path_wav);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
             payment_status_scr_data.status = PAYMENT_CANCEL;
-            voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
-            strcpy(QR_code_screen_data.voice_url, voice_url);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
             ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
             payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef,payment_status_scr_data.Date);
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
@@ -625,13 +654,20 @@ void parse_json_payload(char *data)
                 return;
             }
 
-            //char *payment_date = cJSON_GetObjectItem(data,"Date")->valuestring;
-            //strcpy(payment_status_scr_data.Date, payment_date);
-            //ESP_LOGI(TAG,"payment_date:%s",payment_status_scr_data.Date);
+            if(NULL != cJSON_GetObjectItem(data, "voice_data"))
+            {
+                voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
+                strcpy(QR_code_screen_data.voice_url, voice_url);
+                fetch_and_store_audio_data(voice_url,file_path_wav);
+            }
+            else
+            {
+                ESP_LOGI(TAG, "INVALID STRING");
+                exception_handler();
+                return;
+            }
+
             payment_status_scr_data.status = PAYMENT_FAIL;
-            voice_url = cJSON_GetObjectItem(data, "voice_data")->valuestring;
-            strcpy(QR_code_screen_data.voice_url, voice_url);
-            fetch_and_store_audio_data(voice_url,file_path_wav);
             ESP_LOGI(TAG,"paymentstauts:%d OrderId:%d, BankRef:%d, Date:%d",
             payment_status_scr_data.status, payment_status_scr_data.OrderId, payment_status_scr_data.BankRef, payment_status_scr_data.Date);
             xEventGroupSetBits(event_group, PAYMENTSTATUS_EVT);
@@ -705,6 +741,7 @@ void mqtt_app_start(void)
 {
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = "mqtt://nodered-mqtt.bonrix.in:21883",
+        //.broker.address.uri = "mqtt://192.168.1.2:1883",
         .credentials.authentication.password = "nxon1234",
         .credentials.username = "nxon",
     };
